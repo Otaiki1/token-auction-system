@@ -25,8 +25,8 @@ contract TokenAuctionSystem is ReentrancyGuard{
         uint256 tokenId;
     }
 
-    mapping(uint256 => Token) tokenOwners;
-    mapping(address => uint256) balances;
+    mapping(uint256 => Token) idToToken;
+    mapping(address => uint256[]) balances;
 
     uint256 public ID;
     //add a token to the token auction system
@@ -41,12 +41,12 @@ contract TokenAuctionSystem is ReentrancyGuard{
 
         _token.transferFrom(msg.sender, address(this), _tokenId);
 
-        tokenOwners[ID].owner = msg.sender;
-        tokenOwners[ID].reservePrice = _reservePrice;
-        tokenOwners[ID].token = _token;
-        tokenOwners[ID].tokenId = _tokenId;
+        idToToken[ID].owner = msg.sender;
+        idToToken[ID].reservePrice = _reservePrice;
+        idToToken[ID].token = _token;
+        idToToken[ID].tokenId = _tokenId;
          
-        balances[msg.sender] += 1;
+        balances[msg.sender].push(ID);
     }
     
     //allow sellers make bid
@@ -55,7 +55,7 @@ contract TokenAuctionSystem is ReentrancyGuard{
         //emit each bidding
     function makeBid(uint256 _tokenId) external payable{
         require(_tokenId > 0 && _tokenId <= ID, "Invalid ID");
-        Token storage biddedToken  = tokenOwners[_tokenId];
+        Token storage biddedToken  = idToToken[_tokenId];
 
         require(biddedToken.bidState ==BidStates.Active, "BID CLOSED");
     
@@ -80,9 +80,9 @@ contract TokenAuctionSystem is ReentrancyGuard{
     }
 
     //Token is sold to highest bidder and rest of money is reverted to the bidders
-    function claimToken(uint256 _tokenId) external{
+    function settleAuction(uint256 _tokenId) external{
         require(_tokenId > 0 && _tokenId <= ID, "Invalid ID");
-        Token storage biddedToken  = tokenOwners[_tokenId];
+        Token storage biddedToken  = idToToken[_tokenId];
 
         require(biddedToken.startTime != 0, "auction not ready");
         require(block.timestamp > (biddedToken.startTime + 15 minutes) , "TIME NOT ELAPSED");
@@ -91,8 +91,9 @@ contract TokenAuctionSystem is ReentrancyGuard{
         address winner = biddedToken.currentHighestBidder;
 
         //update storage mapping
-        balances[biddedToken.owner] -= 1;
-        balances[msg.sender] += 1;
+        uint index = findIndex(_tokenId, balances[biddedToken.owner]);
+        delete balances[biddedToken.owner][index];//works on premise that its impossible for an auction id to be 0
+        balances[msg.sender].push(_tokenId);
 
         for(uint i = 0;i <biddedToken.allBidders.length; i++){
             address current = payable(biddedToken.allBidders[i]);
@@ -110,15 +111,47 @@ contract TokenAuctionSystem is ReentrancyGuard{
         
 
         //reset it
-        delete tokenOwners[_tokenId];
+        delete idToToken[_tokenId];
+
+    
 
         //emit event
     }
 
     
+    function getBalance(address _addr) external view returns(uint[] memory){
+        return balances[_addr];
+    }
+    function getAuctionBidders(uint256 _tokenId) external view returns(address[] memory){
+        return idToToken[_tokenId].allBidders;
+    }
+    
+    function getBidderAmount(uint256 _tokenId, address _addr) external view returns(uint256){
+        return idToToken[_tokenId].bidders[_addr];
+    }
+    function getHighestBidder(uint256 _tokenId) external view returns(address){
+        return idToToken[_tokenId].currentHighestBidder;
+    }
+    function getReservePrice(uint256 _tokenId) external view returns(uint256){
+        return idToToken[_tokenId].reservePrice;
+    }
+    function getBidState(uint256 _tokenId) external view returns(BidStates){
+        return idToToken[_tokenId].bidState;
+    }
+    function getTokenInfo(uint256 _tokenId) external view returns(IERC721, uint256){
+        return (idToToken[_tokenId].token, idToToken[_tokenId].tokenId);
+    }
 
+    //A function that finds the index of a particular unique number
+    function findIndex(uint _num, uint[] memory arr) public pure returns(uint){
+        uint i;
+        for(i=0;i<arr.length;i++){
+            if(arr[i] == _num){
+                return i;
+            }
+        }
+        return i+1;
+    }
     
 
-    
-
-}
+}                                      
