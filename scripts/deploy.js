@@ -7,20 +7,28 @@
 const hre = require("hardhat");
 
 async function main() {
-  const currentTimestampInSeconds = Math.round(Date.now() / 1000);
-  const unlockTime = currentTimestampInSeconds + 60;
+  const KnowledgeToken = await hre.ethers.getContractFactory("KnowledgeToken");
+  const knowledgeToken = await KnowledgeToken.deploy(
+    "KnowldegeToken",
+    "KT",
+    "https://ipfs.io/"
+  );
 
-  const lockedAmount = hre.ethers.utils.parseEther("0.001");
+  await knowledgeToken.deployed();
 
-  const Lock = await hre.ethers.getContractFactory("Lock");
-  const lock = await Lock.deploy(unlockTime, { value: lockedAmount });
+  const TokenAuctionSystem = await hre.ethers.getContractFactory(
+    "TokenAuctionSystem"
+  );
+  const tokenAuctionSystem = await TokenAuctionSystem.deploy();
 
-  await lock.deployed();
+  await tokenAuctionSystem.deployed();
 
   console.log(
-    `Lock with ${ethers.utils.formatEther(
-      lockedAmount
-    )}ETH and unlock timestamp ${unlockTime} deployed to ${lock.address}`
+    `Knowledge Token deployed with ${knowledgeToken.address}`
+  );
+
+  console.log(
+    `Token Auction System deployed with ${tokenAuctionSystem.address}`
   );
 }
 
