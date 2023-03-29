@@ -8,7 +8,6 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
-
 contract KnowledgeToken is ERC721 {
     using Counters for Counters.Counter;
     using Strings for uint256;
@@ -22,10 +21,12 @@ contract KnowledgeToken is ERC721 {
     string public uri;
 
     mapping(address => bool) hasMint;
- 
-    constructor(string memory name_, string memory symbol_, string memory _uri)
-        ERC721(name_, symbol_)
-    {
+
+    constructor(
+        string memory name_,
+        string memory symbol_,
+        string memory _uri
+    ) ERC721(name_, symbol_) {
         uri = _uri;
     }
 
@@ -46,7 +47,7 @@ contract KnowledgeToken is ERC721 {
         return totalMinted;
     }
 
-    function _baseURI() internal override view returns (string memory) {
+    function _baseURI() internal view override returns (string memory) {
         return uri;
     }
 
@@ -54,19 +55,15 @@ contract KnowledgeToken is ERC721 {
         uri = _uri;
     }
 
-     function tokenURI(uint256 tokenId) public view override returns (string memory) {
+    function tokenURI(
+        uint256 tokenId
+    ) public view override returns (string memory) {
         _requireMinted(tokenId);
 
         string memory baseURI = _baseURI();
-        return bytes(baseURI).length > 0 ? string(abi.encodePacked(baseURI, tokenId.toString(), ".json")) : "";
+        return
+            bytes(baseURI).length > 0
+                ? string(abi.encodePacked(baseURI, tokenId.toString(), ".json"))
+                : "";
     }
-
-    // function setTokenURI() public {
-    //     _setTokenURI(
-    //         totalMinted,
-    //     "ipfs://QmeYhWhdX1ALiF5AeaHM5VwAR6XEUqL58kmdEx8GxxPkXk"
-    //     ); 
-    // }
-
-  
 }
