@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
 
-contract NFTContract is ERC721 {
+contract KnowledgeToken is ERC721 {
     using Counters for Counters.Counter;
     using Strings for uint256;
 
