@@ -65,6 +65,8 @@ contract TokenAuctionSystem is ReentrancyGuard {
     mapping(uint => Bid) public bids;
     //mapping to associate displaced bidder with their amount
     mapping(address => uint) public displacedBidder;
+    //mapping of tokenId to owner
+    mapping(uint => address) balances;
 
     // Modifier to restrict access to only the seller or the current highest bidder
     modifier onlySellerOrWinner(uint _tokenId) {
@@ -189,6 +191,7 @@ contract TokenAuctionSystem is ReentrancyGuard {
         Token memory token = tokens[_tokenId];
         tokens[_tokenId].tokenOwner = winner;
         tokens[_tokenId].tokenCA.transferFrom(address(this), winner, _tokenId);
+        balances[_tokenId] = winner;
 
         //pay auctioner
         (bool success, ) = payable(owner).call{value: soldPrice}("");
@@ -230,5 +233,9 @@ contract TokenAuctionSystem is ReentrancyGuard {
      */
     function getTokenOwner(uint256 _tokenId) external view returns (address) {
         return tokens[_tokenId].tokenOwner;
+    }
+
+    function getOwnerToken(uint256 _tokenId) external view returns (address) {
+        return balances[_tokenId];
     }
 }
