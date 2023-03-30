@@ -7,150 +7,110 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 contract TokenAuctionSystem is ReentrancyGuard{
 
-    enum BidStates{
-        Inactive,
-        Active,
-        Ended
-    }
     //store token schema
-    struct Token{
-        address owner;
-        mapping(address => uint256) bidders;
-        address[] allBidders;
+    struct Auction{
+        address seller;
+
         address currentHighestBidder;
+        uint256 currentHighestBid;
         uint256 reservePrice;
         uint256 startTime;
-        BidStates bidState;
-        IERC721 token;
+        uint256 endTime;
+ 
+    }
+
+    struct Bid{
+        address bidderAddress;
+        uint256 bidAmount;
+    }
+
+    struct Token{
         uint256 tokenId;
+        address tokenOwner;
+        IERC721 tokenCA;
     }
 
-    mapping(uint256 => Token) idToToken;
-    mapping(address => uint256[]) balances;
+    
+    //mapping of token id to tokens
+    mapping(uint => Token) tokens;
+    //tokenId to Auction structs
+    mapping(uint  => Auction) auctions;
+    //tokenId to bids
+    mapping(uint => Bid) bids;
 
-    uint256 public ID;
-    //add a token to the token auction system
-    // list token
-        //set reserve price
-        //update bid, allows users update their bids
-    function auctionToken(IERC721 _token, uint256 _reservePrice, uint _tokenId) external nonReentrant{
-        require(_reservePrice > 0, "Reserve price must be greater than 0");
-        require(_token.ownerOf(_tokenId) == msg.sender, "NOT OWNER OF TOKEN");
+  
+    
+    function createAuction(uint _tokenId, uint _reservePrice, IERC721 _tokenCA) external{
+        require(_tokenCA.ownerOf(_tokenId) == msg.sender, "NOT OWNER OF TOKEN");
+        require(_reservePrice != 0, "PRICE CANT BE ZERO");
 
-        ID++;
+        //update Mappings
+        tokens[_tokenId] = Token(_tokenId, msg.sender, _tokenCA);
+        auctions[_tokenId] = Auction(msg.sender, address(0), 0, _reservePrice, 0, 0);
 
-        _token.transferFrom(msg.sender, address(this), _tokenId);
+        //transfer token to contract
+        _tokenCA.transferFrom(msg.sender, address(this), _tokenId);
 
-        idToToken[ID].owner = msg.sender;
-        idToToken[ID].reservePrice = _reservePrice;
-        idToToken[ID].token = _token;
-        idToToken[ID].tokenId = _tokenId;
-         
-        balances[msg.sender].push(ID);
+
     }
-    
-    //allow sellers make bid
-        //upon first bid , start counting of 15 minutes 
-        //ignore prices below reserve price
-        //emit each bidding
-    function makeBid(uint256 _tokenId) external payable{
-        require(_tokenId > 0 && _tokenId <= ID, "Invalid ID");
-        Token storage biddedToken  = idToToken[_tokenId];
-
-        require(biddedToken.bidState ==BidStates.Active, "BID CLOSED");
-    
-        //checking for first time bidding
-        if(biddedToken.currentHighestBidder == address(0)){
-            biddedToken.startTime = block.timestamp;
-            biddedToken.currentHighestBidder = msg.sender;
-            biddedToken.bidState = BidStates.Active;
+ 
+    function placeBid(uint256 _tokenId) external payable returns(bool isPlaced){
+        //check to ensure the token is auctioned
+        Auction memory auctionToken = auctions[_tokenId];
+        require(auctionToken.seller != address(0), "Token not auctioned");
+        require(msg.value > auctionToken.reservePrice, "bid amount must be greater than reservePrice");
+        //check  if this is first bid 
+        if(auctionToken.currentHighestBidder == address(0)){
+            auctionToken.startTime  = block.timestamp;
+            auctionToken.endTime = block.timestamp +15 minutes;
         }
 
-        require (block.timestamp < (biddedToken.startTime + 15 minutes), "BIDDING TIME HAS PASSED");
-
-        biddedToken.bidders[msg.sender] += msg.value;
-
-        //update the current highest bidder if msg.value is higher than previous current highest bidder
-        if((biddedToken.bidders[msg.sender]) > (biddedToken.bidders[biddedToken.currentHighestBidder])){
-            biddedToken.currentHighestBidder = msg.sender;
+        if(msg.value <= auctionToken.currentHighestBid){
+           (bool success, ) =  payable(msg.sender).call{value: msg.value}("");
+           if(success){
+            return false;
+           }else{
+            revert("return payment failed");
+           }
+        }else{
+            auctionToken.currentHighestBid = msg.value;
+            auctionToken.currentHighestBidder = msg.sender;
+            //update bids mapping
+            bids[_tokenId] = Bid(msg.sender, msg.value);
+            //return true on successful bid
+            return true;
         }
 
-        biddedToken.allBidders.push(msg.sender);
-        //emit events  at this point
+
     }
 
-    //Token is sold to highest bidder and rest of money is reverted to the bidders
-    function settleAuction(uint256 _tokenId) external{
-        require(_tokenId > 0 && _tokenId <= ID, "Invalid ID");
-        Token storage biddedToken  = idToToken[_tokenId];
+ 
+    function closeAuction(uint256 _tokenId) external {
+        //check to ensure the token end time has reached
+        Auction memory auctionToken = auctions[_tokenId];
+        require(block.timestamp > auctionToken.endTime, "Auction time hasnt elapsed");
+        require(msg.sender == auctionToken.seller || msg.sender == auctionToken.currentHighestBidder, "only seller or highest bidder can call ");
 
-        require(biddedToken.startTime != 0, "auction not ready");
-        require(block.timestamp > (biddedToken.startTime + 15 minutes) , "TIME NOT ELAPSED");
-        require(biddedToken.currentHighestBidder == msg.sender, "NOT WINNER OF THE AUCTION");
-
-        address winner = biddedToken.currentHighestBidder;
-
-        //update storage mapping
-        uint index = findIndex(_tokenId, balances[biddedToken.owner]);
-        delete balances[biddedToken.owner][index];//works on premise that its impossible for an auction id to be 0
-        balances[msg.sender].push(_tokenId);
-
-        for(uint i = 0;i <biddedToken.allBidders.length; i++){
-            address current = payable(biddedToken.allBidders[i]);
-            uint payAmount = biddedToken.bidders[current];
-
-            (bool success, ) = current.call{value: payAmount}("");
-            if(!success){
-                revert("payment failed");
-            }
+        address winner = auctionToken.currentHighestBidder;
+        address owner= auctionToken.seller;
+        uint256 soldPrice = auctionToken.currentHighestBid;
+        //update all mapping
+        auctionToken = Auction(address(0), address(0), 0, 0, 0 ,0);
+        bids[_tokenId] = Bid(address(0), 0);
+        //transfer token
+        Token memory token  = tokens[_tokenId];
+        token.tokenOwner = winner;
+        token.tokenCA.transferFrom(address(this), winner, _tokenId);
+        //pay auctioner
+        (bool success, ) = payable(owner).call{value: soldPrice}("");
+        if(!success){
+            revert("pay auctioneer failed");
         }
-        
-        IERC721 tokenStandard = biddedToken.token;
-        tokenStandard.transferFrom(address(this), winner, biddedToken.tokenId);
-        
-        
-
-        //reset it
-        delete idToToken[_tokenId];
-
-    
-
-        //emit event
-    }
-
-    
-    function getBalance(address _addr) external view returns(uint[] memory){
-        return balances[_addr];
-    }
-    function getAuctionBidders(uint256 _tokenId) external view returns(address[] memory){
-        return idToToken[_tokenId].allBidders;
     }
     
-    function getBidderAmount(uint256 _tokenId, address _addr) external view returns(uint256){
-        return idToToken[_tokenId].bidders[_addr];
-    }
-    function getHighestBidder(uint256 _tokenId) external view returns(address){
-        return idToToken[_tokenId].currentHighestBidder;
-    }
-    function getReservePrice(uint256 _tokenId) external view returns(uint256){
-        return idToToken[_tokenId].reservePrice;
-    }
-    function getBidState(uint256 _tokenId) external view returns(BidStates){
-        return idToToken[_tokenId].bidState;
-    }
-    function getTokenInfo(uint256 _tokenId) external view returns(IERC721, uint256){
-        return (idToToken[_tokenId].token, idToToken[_tokenId].tokenId);
-    }
 
-    //A function that finds the index of a particular unique number
-    function findIndex(uint _num, uint[] memory arr) public pure returns(uint){
-        uint i;
-        for(i=0;i<arr.length;i++){
-            if(arr[i] == _num){
-                return i;
-            }
-        }
-        return i+1;
+    function getTokenOwner(uint256 _tokenId) external view returns(address){
+        return tokens[_tokenId].tokenOwner;
     }
     
 
