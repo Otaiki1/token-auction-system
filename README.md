@@ -1,55 +1,37 @@
-# Token Auction System (TAS)
+# Token Auction System
 
-## Introduction
+Token Auction System is a smart contract on the Ethereum blockchain that allows users to create auctions for their ERC721 tokens and receive bids from other users.
 
-This smart contract is designed to enables users ("sellers" and "bidders") to exchange tokens via an English auction for which the following features are required:
+## Features
 
-## Data Structures
+- Users can create auctions for their ERC721 tokens.
+- Bidders can place bids on auctions.
+- The auction closes after !5 mins when the first bid is made, and the highest bidder wins the token.
+- The seller receives the winning bid amount, and the token is transferred to the winning bidder.
 
-    Auction: a struct that stores information about an auction, including the seller's address, the reserve price, the current highest bid, the address of the highest bidder, and the end time of the auction.
+## Requirements
 
-    Bid: a struct that stores information about a bid, including the bidder's address and the amount of the bid.
-    Token: a struct that stores information about a token, including the token ID and the owner's address.
-
-## State Variables
-
-    tokens: a mapping of token IDs to Token structs.
-
-    auctions: a mapping of token IDs to Auction structs.
-
-    bids: a mapping of token IDs to Bid structs.
-
-## Modifiers
-
-    onlySeller: a modifier that restricts access to a function to the seller of the corresponding auction.
-
-    onlyBidder: a modifier that restricts access to a function to a bidder who has placed a bid on the corresponding auction.
-
-## Functions
-
-    createAuction(tokenId, reservePrice): allows a seller to create a new auction for a token with the specified ID and reserve price.
-    placeBid(tokenId): allows a bidder to place a bid on an auction for a token with the specified ID. The bid must be at least equal to the reserve price set by the seller. If the bid is the first bid on the auction, the auction end time is set to 15 minutes from the time the bid was placed.
-
-    closeAuction(tokenId): closes an auction and transfers the token to the highest bidder, if bids were placed and the reserve price was met. Only the seller or highest bidder can call this function.
-
-    getTokenOwner(tokenId): returns the current owner of the specified token.
-
+- Solidity 0.8.18
+- OpenZeppelin 4.3.2
 
 ## Usage
 
-To use this contract, follow these steps:
+### createAuction
 
-1. npm i
-2. npx hardhat deploy
-3. npx hardhat test
+To create an auction, call the `createAuction` function, passing in the `tokenId` of the ERC721 token to be auctioned, the `reservePrice` of the auction, and the `IERC721` contract address of the token. The function transfers the token to the contract, so the user must be the owner of the token.
 
+### placeBid
 
+To place a bid on an auction, call the `placeBid` function, passing in the `tokenId` of the auction and the bid amount in ETH. The bid must be greater than the reserve price and the current highest bid, if any. If the bid is successful, the function returns `true`. If the bid fails, the function returns `false`, and the user's ETH is refunded.
 
-## Security
+### closeAuction
 
-This contract has been designed with security in mind, but it is important to note that no contract is completely secure. Users should exercise caution when interacting with this contract and be aware of potential risks.
+To close an auction, call the `closeAuction` function, passing in the `tokenId` of the auction. The function transfers the token to the winning bidder and sends the winning bid amount to the seller.
+
+### getTokenOwner
+
+To get the owner of an ERC721 token, call the `getTokenOwner` function, passing in the `tokenId` of the token. The function returns the address of the token owner.
 
 ## License
 
-This project is licensed under the MIT License.]
-
+This project is licensed under the MIT License.
