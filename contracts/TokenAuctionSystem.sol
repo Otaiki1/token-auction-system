@@ -32,15 +32,19 @@ contract TokenAuctionSystem is ReentrancyGuard{
 
     
     //mapping of token id to tokens
-    mapping(uint => Token) tokens;
+    mapping(uint256 => Token) tokens;
     //tokenId to Auction structs
-    mapping(uint  => Auction) auctions;
+    mapping(uint256  => Auction) auctions;
     //tokenId to bids
-    mapping(uint => Bid) bids;
+    mapping(uint256 => Bid) bids;
 
+    modifier onlySellerOrWinner(uint256 _tokenId){
+        require(msg.sender == auctions[_tokenId].seller || msg.sender == auctions[_tokenId].currentHighestBidder, "NOT ALLOWED");
+        _;
+    }
   
     
-    function createAuction(uint _tokenId, uint _reservePrice, IERC721 _tokenCA) external{
+    function createAuction(uint256 _tokenId, uint256 _reservePrice, IERC721 _tokenCA) external nonReentrant{
         require(_tokenCA.ownerOf(_tokenId) == msg.sender, "NOT OWNER OF TOKEN");
         require(_reservePrice != 0, "PRICE CANT BE ZERO");
 
@@ -54,7 +58,7 @@ contract TokenAuctionSystem is ReentrancyGuard{
 
     }
  
-    function placeBid(uint256 _tokenId) external payable returns(bool isPlaced){
+    function placeBid(uint256 _tokenId) external payable nonReentrant returns(bool isPlaced) {
         //check to ensure the token is auctioned
         Auction memory auctionToken = auctions[_tokenId];
         require(auctionToken.seller != address(0), "Token not auctioned");
@@ -85,11 +89,10 @@ contract TokenAuctionSystem is ReentrancyGuard{
     }
 
  
-    function closeAuction(uint256 _tokenId) external {
+    function closeAuction(uint256 _tokenId) external nonReentrant onlySellerOrWinner(_tokenId){
         //check to ensure the token end time has reached
         Auction memory auctionToken = auctions[_tokenId];
         require(block.timestamp > auctionToken.endTime, "Auction time hasnt elapsed");
-        require(msg.sender == auctionToken.seller || msg.sender == auctionToken.currentHighestBidder, "only seller or highest bidder can call ");
 
         address winner = auctionToken.currentHighestBidder;
         address owner= auctionToken.seller;
