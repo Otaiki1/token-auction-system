@@ -30,7 +30,7 @@ contract KnowledgeToken is ERC721 {
         uri = _uri;
     }
 
-    function mintNFT() external {
+    function mintToken() external {
         uint256 newTokenId = _nftIds.current();
         require(newTokenId <= MAX_SUPPLY, "limit exceeded");
         require(hasMint[msg.sender] == false, "has already minted");

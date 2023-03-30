@@ -58,13 +58,13 @@ contract TokenAuctionSystem is ReentrancyGuard {
     }
 
     // Mapping to associate each token ID with its respective Token struct
-    mapping(uint => Token) tokens;
+    mapping(uint => Token) public tokens;
     // Mapping to associate each token ID with its respective Auction struct
-    mapping(uint => Auction) auctions;
+    mapping(uint => Auction) public auctions;
     // Mapping to associate each token ID with its respective Bid struct
-    mapping(uint => Bid) bids;
+    mapping(uint => Bid) public bids;
     //mapping to associate displaced bidder with their amount
-    mapping(address => uint) displacedBidder;
+    mapping(address => uint) public displacedBidder;
 
     // Modifier to restrict access to only the seller or the current highest bidder
     modifier onlySellerOrWinner(uint _tokenId) {
@@ -144,8 +144,8 @@ contract TokenAuctionSystem is ReentrancyGuard {
             displacedBidder[auctionToken.currentHighestBidder] = auctionToken
                 .currentHighestBid;
             //then replace with new highest bid
-            auctionToken.currentHighestBid = msg.value;
-            auctionToken.currentHighestBidder = msg.sender;
+            auctions[_tokenId].currentHighestBid = msg.value;
+            auctions[_tokenId].currentHighestBidder = msg.sender;
             bids[_tokenId] = Bid(msg.sender, msg.value);
             //emit the Bid created event
             emit BidPlaced(
@@ -187,8 +187,8 @@ contract TokenAuctionSystem is ReentrancyGuard {
 
         //transfer token to winner
         Token memory token = tokens[_tokenId];
-        token.tokenOwner = winner;
-        token.tokenCA.transferFrom(address(this), winner, _tokenId);
+        tokens[_tokenId].tokenOwner = winner;
+        tokens[_tokenId].tokenCA.transferFrom(address(this), winner, _tokenId);
 
         //pay auctioner
         (bool success, ) = payable(owner).call{value: soldPrice}("");
