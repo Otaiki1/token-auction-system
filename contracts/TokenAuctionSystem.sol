@@ -63,6 +63,8 @@ contract TokenAuctionSystem is ReentrancyGuard {
     mapping(uint => Auction) auctions;
     // Mapping to associate each token ID with its respective Bid struct
     mapping(uint => Bid) bids;
+    //mapping to associate displaced bidder with their amount
+    mapping(address => uint) displacedBidder;
 
     // Modifier to restrict access to only the seller or the current highest bidder
     modifier onlySellerOrWinner(uint _tokenId) {
@@ -138,6 +140,10 @@ contract TokenAuctionSystem is ReentrancyGuard {
             }
         } else {
             //if the bid amount is higher than the current highest bid, update the mappings
+            //startout with displaced bidder
+            displacedBidder[auctionToken.currentHighestBidder] = auctionToken
+                .currentHighestBid;
+            //then replace with new highest bid
             auctionToken.currentHighestBid = msg.value;
             auctionToken.currentHighestBidder = msg.sender;
             bids[_tokenId] = Bid(msg.sender, msg.value);
@@ -198,6 +204,23 @@ contract TokenAuctionSystem is ReentrancyGuard {
             owner,
             winner
         );
+    }
+
+    /**
+     * @dev Allows bidder withdraw his bid after being displaced as current highest bidder
+     *      The auction can only be called by one time highest bidder.
+     *      The function can only be called after the person has been displaced
+     *      The caller is returned his bid amount
+     */
+    function withdrawBid() external {
+        require(displacedBidder[msg.sender] != 0, "NOT DISPLACED BIDDER");
+        displacedBidder[msg.sender] = 0;
+        (bool success, ) = payable(msg.sender).call{
+            value: displacedBidder[msg.sender]
+        }("");
+        if (!success) {
+            revert("Withdraw failed");
+        }
     }
 
     /**
